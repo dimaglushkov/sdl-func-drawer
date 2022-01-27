@@ -3,7 +3,7 @@
 #include "sdl_func_drawer.h"
 
 double func(double x) {
-    return sqrt(x);
+    return x;
 }
 
 void print_usage() {
@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     }
 
 
-    drawer_t* dr = dr_init(600, 600);
+    drawer_t* dr = dr_init(1600, 800);
     if (dr == NULL)
         return 1;
     dr->x_max = x_max;

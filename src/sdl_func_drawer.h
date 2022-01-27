@@ -18,7 +18,8 @@ typedef struct {
     SDL_Window* window;
     SDL_Renderer* renderer;
     int w, h;
-    double x_min, x_max, y_max, y_min;
+    double x_min, x_max, y_max, y_min, cx, cy;
+    char quadrants[4];
 } drawer_t;
 
 SDL_Color random_color();

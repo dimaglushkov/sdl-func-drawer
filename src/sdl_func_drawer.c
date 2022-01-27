@@ -8,10 +8,11 @@ const struct color_set colors = {
         {0,0,255,0}
 };
 
-int write_info(drawer_t* dr);
-int get_y_min_max(drawer_t* dr, double (*func)(double));
-int draw_xoy(drawer_t* dr);
+const double DX = 0.1;
 
+int write_info(drawer_t* dr);
+int precalculate(drawer_t* dr, double (*func)(double));
+int draw_xoy(drawer_t* dr);
 
 drawer_t* dr_init(int w, int h) {
     if (SDL_Init(SDL_INIT_VIDEO)) {
@@ -36,16 +37,14 @@ drawer_t* dr_init(int w, int h) {
     return dr;
 }
 
-
 void dr_draw(drawer_t* dr, double (*func)(double), SDL_Color color) {
     SDL_Event event;
     SDL_SetRenderDrawColor(dr->renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(dr->renderer);
 
-    get_y_min_max(dr, func);
+    precalculate(dr, func);
     write_info(dr);
-
-
+    draw_xoy(dr);
 
     while (SDL_WaitEvent(&event)) {
         if (event.type == SDL_QUIT) {
@@ -55,13 +54,10 @@ void dr_draw(drawer_t* dr, double (*func)(double), SDL_Color color) {
 
 }
 
-int draw_xoy(drawer_t* dr){
-
-}
 
 int write_info(drawer_t* dr) {
     TTF_Init();
-    char buffer[50];
+    char buffer[50], quad_buffer[10];
     TTF_Font *font = TTF_OpenFont("/usr/share/fonts/TTF/noto-mono.ttf", 15);
     if (font == NULL) {
         SDL_Log("Unable to open font: %s", SDL_GetError());
@@ -79,8 +75,22 @@ int write_info(drawer_t* dr) {
     sprintf(buffer, "y lies in [%.3f, %.3f]", dr->y_min, dr->y_max);
     TextSurface = TTF_RenderText_Solid(font, buffer, colors.white);
     TextTexture = SDL_CreateTextureFromSurface(dr->renderer, TextSurface);
-    SDL_Rect YTextRect = {10, 12 + XTextRect.h, TextSurface->w, TextSurface->h };
+    SDL_Rect YTextRect = {10, XTextRect.y + XTextRect.h + 2, TextSurface->w, TextSurface->h };
     SDL_RenderCopy(dr->renderer, TextTexture, NULL, &YTextRect);
+    buffer[0] = '\0';
+
+    for (int i = 0, j = 0; i < 4; i++){
+        if(dr->quadrants[i]) {
+            sprintf(&quad_buffer[j++], "%d", i+1);
+            quad_buffer[j++] = ' ';
+        }
+        quad_buffer[j] = '\0';
+    }
+    sprintf(buffer, "quadrants: %s", quad_buffer);
+    TextSurface = TTF_RenderText_Solid(font, buffer, colors.white);
+    TextTexture = SDL_CreateTextureFromSurface(dr->renderer, TextSurface);
+    SDL_Rect QuadTextRect = {10, YTextRect.y + YTextRect.h + 2, TextSurface->w, TextSurface->h };
+    SDL_RenderCopy(dr->renderer, TextTexture, NULL, &QuadTextRect);
 
     SDL_RenderPresent(dr->renderer);
 
@@ -91,17 +101,31 @@ int write_info(drawer_t* dr) {
     return 0;
 }
 
-int get_y_min_max(drawer_t* dr, double (*func)(double)){
+int draw_xoy(drawer_t* dr) {
+    SDL_SetRenderDrawColor(dr->renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+
+    if((dr->quadrants[0] && dr->quadrants[3]) || (dr->quadrants[1] && dr->quadrants[2])) {
+        SDL_RenderDrawLine(dr->renderer, 0, floor(dr->cy * dr->y_max), dr->w, floor(dr->cy * dr->y_max));
+    }
+
+    if((dr->quadrants[0] && dr->quadrants[1]) || (dr->quadrants[2] && dr->quadrants[3])) {
+        SDL_RenderDrawLine(dr->renderer, floor(dr->cx * fabs(dr->x_min)), 0, floor(dr->cx * fabs(dr->x_min)), dr->h);
+    }
+    SDL_RenderPresent(dr->renderer);
+
+}
+
+int precalculate(drawer_t* dr, double (*func)(double)) {
     double i = dr->x_min;
     double val = func(dr->x_min);
 
-//  find initial values
+//  find initial ymin ymax values
     do {
         dr->y_max = dr->y_min = func(i);
-        i += 0.1;
+        i += DX;
     } while (isnan(dr->y_min) && i < dr->x_max);
 
-//  find actual values
+//  find actual ymin ymax  values
     while (i < dr->x_max) {
         val = func(i);
         if (isnan(val))
@@ -111,8 +135,26 @@ int get_y_min_max(drawer_t* dr, double (*func)(double)){
             dr->y_max = val;
         if (val < dr->y_min)
             dr->y_min = val;
-        i += 0.1;
+        i += DX;
     }
+
+//  find graph quadrants
+    for(int j =0; j < 4; j++)
+        dr->quadrants[j] = 0;
+
+    if (dr->x_max > 0 && dr->y_max > 0)
+        dr->quadrants[0] = 1;
+    if (dr->x_min < 0 && dr->y_max > 0)
+        dr->quadrants[1] = 1;
+    if (dr->x_min < 0 && dr->y_min < 0)
+        dr->quadrants[2] = 1;
+    if (dr->x_max > 0 && dr->y_min < 0)
+        dr->quadrants[3] = 1;
+
+//  calculate conversion coefficients
+    dr->cx = dr->w / (fabs(dr->x_min) + fabs(dr->x_max));
+    dr->cy = dr->h / (fabs(dr->y_min) + fabs(dr->y_max));
+
 }
 
 void dr_close(drawer_t* dr) {
@@ -126,7 +168,7 @@ void dr_close(drawer_t* dr) {
     free(dr);
 }
 
-SDL_Color random_color(){
+SDL_Color random_color() {
     SDL_Color color = {rand() % 155 + 100, rand() % 155 + 100, rand() % 155 + 100, 255};
     return color;
 }
