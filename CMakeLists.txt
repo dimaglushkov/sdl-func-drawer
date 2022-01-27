@@ -11,3 +11,5 @@ target_link_libraries(sdl_func_drawer
         SDL2
         SDL2_ttf
         m)
+
+file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
