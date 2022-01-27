@@ -9,13 +9,8 @@ const struct color_set colors = {
 };
 
 int write_info(drawer_t* dr);
-
-
-SDL_Color random_color(){
-
-    SDL_Color color = {rand() % 155 + 100, rand() % 155 + 100, rand() % 155 + 100, 255};
-    return color;
-}
+int get_y_min_max(drawer_t* dr, double (*func)(double));
+int draw_xoy(drawer_t* dr);
 
 
 drawer_t* dr_init(int w, int h) {
@@ -47,14 +42,9 @@ void dr_draw(drawer_t* dr, double (*func)(double), SDL_Color color) {
     SDL_SetRenderDrawColor(dr->renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(dr->renderer);
 
-    SDL_SetRenderDrawColor(dr->renderer, color.r, color.g, color.b, color.a);
-    SDL_RenderDrawLine(dr->renderer, 320, 200, 300, 240);
-    SDL_RenderDrawLine(dr->renderer, 300, 240, 340, 240);
-    SDL_RenderDrawLine(dr->renderer, 340, 240, 320, 200);
-    SDL_RenderPresent(dr->renderer);
-
+    get_y_min_max(dr, func);
     write_info(dr);
-    SDL_RenderPresent(dr->renderer);
+
 
 
     while (SDL_WaitEvent(&event)) {
@@ -65,9 +55,13 @@ void dr_draw(drawer_t* dr, double (*func)(double), SDL_Color color) {
 
 }
 
+int draw_xoy(drawer_t* dr){
+
+}
+
 int write_info(drawer_t* dr) {
     TTF_Init();
-
+    char buffer[50];
     TTF_Font *font = TTF_OpenFont("/usr/share/fonts/TTF/noto-mono.ttf", 15);
     if (font == NULL) {
         SDL_Log("Unable to open font: %s", SDL_GetError());
@@ -75,22 +69,50 @@ int write_info(drawer_t* dr) {
         return 1;
     }
 
-    SDL_Surface* TextSurface = TTF_RenderText_Solid(font, "Message\nMessage", colors.white);
+    sprintf(buffer, "x lies in [%.3f, %.3f]", dr->x_min, dr->x_max);
+    SDL_Surface* TextSurface = TTF_RenderText_Solid(font, buffer, colors.white);
     SDL_Texture* TextTexture = SDL_CreateTextureFromSurface(dr->renderer, TextSurface);
-    SDL_Rect TextRect;
-    TextRect.x = 10;
-    TextRect.y = 10;
-    TextRect.w = TextSurface->w;
-    TextRect.h = TextSurface->h;
+    SDL_Rect XTextRect = {10, 10, TextSurface->w, TextSurface->h };
+    SDL_RenderCopy(dr->renderer, TextTexture, NULL, &XTextRect);
+    buffer[0] = '\0';
 
+    sprintf(buffer, "y lies in [%.3f, %.3f]", dr->y_min, dr->y_max);
+    TextSurface = TTF_RenderText_Solid(font, buffer, colors.white);
+    TextTexture = SDL_CreateTextureFromSurface(dr->renderer, TextSurface);
+    SDL_Rect YTextRect = {10, 12 + XTextRect.h, TextSurface->w, TextSurface->h };
+    SDL_RenderCopy(dr->renderer, TextTexture, NULL, &YTextRect);
 
-    SDL_RenderCopy(dr->renderer, TextTexture, NULL, &TextRect);
+    SDL_RenderPresent(dr->renderer);
 
     SDL_FreeSurface(TextSurface);
     SDL_DestroyTexture(TextTexture);
     TTF_CloseFont(font);
     TTF_Quit();
     return 0;
+}
+
+int get_y_min_max(drawer_t* dr, double (*func)(double)){
+    double i = dr->x_min;
+    double val = func(dr->x_min);
+
+//  find initial values
+    do {
+        dr->y_max = dr->y_min = func(i);
+        i += 0.1;
+    } while (isnan(dr->y_min) && i < dr->x_max);
+
+//  find actual values
+    while (i < dr->x_max) {
+        val = func(i);
+        if (isnan(val))
+            continue;
+
+        if (val > dr->y_max)
+            dr->y_max = val;
+        if (val < dr->y_min)
+            dr->y_min = val;
+        i += 0.1;
+    }
 }
 
 void dr_close(drawer_t* dr) {
@@ -103,3 +125,9 @@ void dr_close(drawer_t* dr) {
     SDL_Quit();
     free(dr);
 }
+
+SDL_Color random_color(){
+    SDL_Color color = {rand() % 155 + 100, rand() % 155 + 100, rand() % 155 + 100, 255};
+    return color;
+}
+

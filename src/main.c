@@ -3,7 +3,7 @@
 #include "sdl_func_drawer.h"
 
 double func(double x) {
-    return sin(x);
+    return sqrt(x);
 }
 
 void print_usage() {
