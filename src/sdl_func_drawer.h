@@ -18,7 +18,7 @@ typedef struct {
     SDL_Window* window;
     SDL_Renderer* renderer;
     int w, h;
-    double x_min, x_max, y_max, y_min, cx, cy;
+    double x_min, x_max, y_max, y_min, cx, cy, step, y_limit;
     char quadrants[4];
 } drawer_t;
 

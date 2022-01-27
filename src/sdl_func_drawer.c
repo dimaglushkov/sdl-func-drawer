@@ -8,11 +8,10 @@ const struct color_set colors = {
         {0,0,255,0}
 };
 
-const double DX = 0.1;
-
 int write_info(drawer_t* dr);
 int precalculate(drawer_t* dr, double (*func)(double));
 int draw_xoy(drawer_t* dr);
+int draw_func(drawer_t * dr, double (*func)(double));
 
 drawer_t* dr_init(int w, int h) {
     if (SDL_Init(SDL_INIT_VIDEO)) {
@@ -45,7 +44,10 @@ void dr_draw(drawer_t* dr, double (*func)(double), SDL_Color color) {
     precalculate(dr, func);
     write_info(dr);
     draw_xoy(dr);
+    draw_func(dr, func);
 
+
+    SDL_RenderPresent(dr->renderer);
     while (SDL_WaitEvent(&event)) {
         if (event.type == SDL_QUIT) {
             break;
@@ -66,14 +68,14 @@ int write_info(drawer_t* dr) {
     }
 
     sprintf(buffer, "x lies in [%.3f, %.3f]", dr->x_min, dr->x_max);
-    SDL_Surface* TextSurface = TTF_RenderText_Solid(font, buffer, colors.white);
+    SDL_Surface* TextSurface = TTF_RenderText_Solid(font, buffer, colors.blue);
     SDL_Texture* TextTexture = SDL_CreateTextureFromSurface(dr->renderer, TextSurface);
     SDL_Rect XTextRect = {10, 10, TextSurface->w, TextSurface->h };
     SDL_RenderCopy(dr->renderer, TextTexture, NULL, &XTextRect);
     buffer[0] = '\0';
 
     sprintf(buffer, "y lies in [%.3f, %.3f]", dr->y_min, dr->y_max);
-    TextSurface = TTF_RenderText_Solid(font, buffer, colors.white);
+    TextSurface = TTF_RenderText_Solid(font, buffer, colors.blue);
     TextTexture = SDL_CreateTextureFromSurface(dr->renderer, TextSurface);
     SDL_Rect YTextRect = {10, XTextRect.y + XTextRect.h + 2, TextSurface->w, TextSurface->h };
     SDL_RenderCopy(dr->renderer, TextTexture, NULL, &YTextRect);
@@ -87,7 +89,7 @@ int write_info(drawer_t* dr) {
         quad_buffer[j] = '\0';
     }
     sprintf(buffer, "quadrants: %s", quad_buffer);
-    TextSurface = TTF_RenderText_Solid(font, buffer, colors.white);
+    TextSurface = TTF_RenderText_Solid(font, buffer, colors.blue);
     TextTexture = SDL_CreateTextureFromSurface(dr->renderer, TextSurface);
     SDL_Rect QuadTextRect = {10, YTextRect.y + YTextRect.h + 2, TextSurface->w, TextSurface->h };
     SDL_RenderCopy(dr->renderer, TextTexture, NULL, &QuadTextRect);
@@ -115,27 +117,53 @@ int draw_xoy(drawer_t* dr) {
 
 }
 
+int draw_func(drawer_t * dr, double (*func)(double)) {
+    double y;
+    SDL_Color color = random_color();
+    SDL_SetRenderDrawColor(dr->renderer, color.r, color.g, color.b, color.a);
+
+    for (double x = dr->x_min; x <= dr->x_max; x += dr->step) {
+        y = func(x);
+        if (isnan(y))
+            continue;
+        if (fabs(y) > dr->y_limit)
+            y = dr->y_limit;
+        SDL_RenderDrawPoint(dr->renderer, floor((x + fabs(dr->x_min)) * dr->cx), floor((fabs(dr->y_max) - y) * dr->cy ));
+//        SDL_RenderPresent(dr->renderer);
+
+    }
+}
+
 int precalculate(drawer_t* dr, double (*func)(double)) {
     double i = dr->x_min;
     double val = func(dr->x_min);
 
+//  find optimal step
+    dr->step = (fabs(dr->x_min) + fabs(dr->x_max)) / (dr->w * 5);
+
+//  find optimal y limit
+    dr->y_limit = (fabs(dr->x_min) + fabs(dr->y_max)) * 10;
+
+
 //  find initial ymin ymax values
     do {
         dr->y_max = dr->y_min = func(i);
-        i += DX;
+        i += dr->step;
     } while (isnan(dr->y_min) && i < dr->x_max);
 
 //  find actual ymin ymax  values
-    while (i < dr->x_max) {
+    while (i <= dr->x_max) {
         val = func(i);
         if (isnan(val))
             continue;
+        if (fabs(val) > dr->y_limit)
+            val = dr->y_limit;
 
         if (val > dr->y_max)
             dr->y_max = val;
         if (val < dr->y_min)
             dr->y_min = val;
-        i += DX;
+        i += dr->step;
     }
 
 //  find graph quadrants
