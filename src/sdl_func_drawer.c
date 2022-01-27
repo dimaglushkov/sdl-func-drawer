@@ -16,7 +16,7 @@ int draw_func(drawer_t * dr, double (*func)(double), SDL_Color color);
 int draw_func_legend(drawer_t * dr, int k, SDL_Color color);
 
 
-drawer_t* dr_init(int w, int h, int n) {
+drawer_t* SFD_init(int w, int h, double x_min, double x_max, double y_min, double y_max, int n) {
     if (SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
         SDL_Quit();
@@ -29,18 +29,21 @@ drawer_t* dr_init(int w, int h, int n) {
     dr->w = w;
     dr->h = h;
     dr->num = n;
-
+    dr->x_min = x_min;
+    dr->x_max = x_max;
+    dr->y_min = y_min;
+    dr->y_max = y_max;
 
     if (SDL_CreateWindowAndRenderer(dr->w, dr->h, 0, &dr->window, &dr->renderer)) {
         SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
-        dr_close(dr);
+        SFD_close(dr);
         return NULL;
     }
 
     return dr;
 }
 
-void dr_draw(drawer_t* dr, f func[]) {
+void SFD_draw(drawer_t* dr, f func[]) {
     SDL_Event event;
     SDL_SetRenderDrawColor(dr->renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(dr->renderer);
@@ -53,8 +56,6 @@ void dr_draw(drawer_t* dr, f func[]) {
         draw_func_legend(dr, i, color);
     }
     write_info(dr);
-
-
 
     SDL_RenderPresent(dr->renderer);
     while (SDL_WaitEvent(&event)) {
@@ -164,47 +165,51 @@ int draw_func(drawer_t * dr, double (*func)(double), SDL_Color color) {
             continue;
         if (fabs(y) > dr->y_limit)
             y = dr->y_limit;
-        SDL_RenderDrawPoint(dr->renderer, floor((x + fabs(dr->x_min)) * dr->cx), floor((fabs(dr->y_max) - y) * dr->cy ));
-
+        int a = floor((x + fabs(dr->x_min)) * dr->cx);
+        int b = floor((fabs(dr->y_max) - y) * dr->cy);
+        SDL_RenderDrawPoint(dr->renderer, floor((x - dr->x_min) * dr->cx), floor((fabs(dr->y_max) - y) * dr->cy) );
     }
+    SDL_RenderPresent(dr->renderer);
+
 }
 
 int precalculate(drawer_t* dr, f* func) {
     double i = dr->x_min;
     double val;
 
-//  find optimal step
+    // find optimal step
     dr->step = (fabs(dr->x_min) + fabs(dr->x_max)) / (dr->w * 5);
 
-//  find optimal y limit
-    dr->y_limit = (fabs(dr->x_min) + fabs(dr->x_max)) * 5;
+    // ind optimal y limit
+    dr->y_limit = (fabs(dr->x_min) + fabs(dr->x_max)) * 10;
 
+    if (!dr->y_min && !dr->y_max) {
+    // find initial ymin ymax values
+        do {
+            dr->y_max = dr->y_min = func[0](i);
+            i += dr->step;
+        } while (isnan(dr->y_min) || (isinf(dr->y_min)) || dr->y_max > dr->y_limit);
 
-//  find initial ymin ymax values
-    do {
-        dr->y_max = dr->y_min = func[0](i);
-        i += dr->step;
-    } while (isnan(dr->y_min) && i < dr->x_max);
+        // find actual ymin ymax  values
+        for (int k = 0; k < dr->num; k++) {
+            for (double x = i; x <= dr->x_max; x += dr->step) {
+                val = func[k](x);
+                if (isnan(val))
+                    continue;
+                if (val > dr->y_limit)
+                    val = dr->y_limit;
+                if (val < -1 * dr->y_limit)
+                    val = -1 * dr->y_limit;
 
-//  find actual ymin ymax  values
-    for (int k = 0; k < dr->num; k++) {
-        for (double x = i; x <= dr->x_max; x += dr->step) {
-            val = func[k](x);
-            if (isnan(val))
-                continue;
-            if (val > dr->y_limit)
-                val = dr->y_limit;
-            if (val < -1 * dr->y_limit)
-                val = -1 * dr->y_limit;
-
-            if (val > dr->y_max)
-                dr->y_max = val;
-            if (val < dr->y_min)
-                dr->y_min = val;
+                if (val > dr->y_max)
+                    dr->y_max = val;
+                if (val < dr->y_min)
+                    dr->y_min = val;
+            }
+            i = dr->x_min;
         }
-        i = dr->x_min;
     }
-//  find graph quadrants
+    // find graph quadrants
     for(int j =0; j < 4; j++)
         dr->quadrants[j] = 0;
 
@@ -217,13 +222,18 @@ int precalculate(drawer_t* dr, f* func) {
     if (dr->x_max > 0 && dr->y_min < 0)
         dr->quadrants[3] = 1;
 
-//  calculate conversion coefficients
-    dr->cx = dr->w / (fabs(dr->x_min) + fabs(dr->x_max));
-    dr->cy = dr->h / (fabs(dr->y_min) + fabs(dr->y_max));
-
+    // calculate conversion coefficients
+    dr->cx = dr->w / (fabs(dr->x_max - dr->x_min));
+    dr->cy = dr->h / (fabs(dr->y_max - dr->y_min));
 }
 
-void dr_close(drawer_t* dr) {
+SDL_Color random_color() {
+    SDL_Color color = {rand() % 175 + 50, rand() % 205 + 50, rand() % 205 + 50, 255};
+    return color;
+}
+
+
+void SFD_close(drawer_t* dr) {
     if (dr->renderer) {
         SDL_DestroyRenderer(dr->renderer);
     }
@@ -232,10 +242,5 @@ void dr_close(drawer_t* dr) {
     }
     SDL_Quit();
     free(dr);
-}
-
-SDL_Color random_color() {
-    SDL_Color color = {rand() % 175 + 50, rand() % 205 + 50, rand() % 205 + 50, 255};
-    return color;
 }
 

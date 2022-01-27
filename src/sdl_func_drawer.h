@@ -8,12 +8,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-struct color_set {
-    SDL_Color white, black, red, green, blue;
-};
-
-extern const struct color_set colors;
-
 typedef struct {
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -22,11 +16,17 @@ typedef struct {
     char quadrants[4];
 } drawer_t;
 
+struct color_set {
+    SDL_Color white, black, red, green, blue;
+};
+
+extern const struct color_set colors;
+
 typedef double (*f)(double);
 
+drawer_t* SFD_init(int w, int h, double x_min, double x_max, double y_min, double y_max, int n);
+void SFD_draw(drawer_t* dr, f func[]);
+void SFD_close(drawer_t* dr);
 
-drawer_t* dr_init(int w, int h, int n);
-void dr_draw(drawer_t* dr, f func[]);
-void dr_close(drawer_t* dr);
 
 #endif //SDL_FUNC_DRAWER_SDL_FUNC_DRAWER_H

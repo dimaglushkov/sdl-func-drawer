@@ -2,8 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 project(sdl_func_drawer C)
 
 set(CMAKE_C_STANDARD 11)
+# For linux
+set(SDL_TTF_LIBRARIES /usr/lib/)
+set(SDL_TTF_INCLUDE_DIRS /usr/lib/)
+
 find_package(SDL2 REQUIRED)
-find_package(SDL_ttf REQUIRED)
 
 add_executable(sdl_func_drawer
         src/main.c src/sdl_func_drawer.c src/sdl_func_drawer.h)
